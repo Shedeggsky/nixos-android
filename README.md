@@ -9,12 +9,12 @@ wget -qO- "https://raw.githubusercontent.com/Shedeggsky/nixos-android/main/insta
 ```
 
 ## Getting Started
-To launch your NixOS container, run:
+To launch your NixOS container, `run`:
 ```
 ./nixos.sh
 ```
 
-To exit the container sessioin, run:
+To exit the container sessioin, `run`:
 ```
 exit
 ```
@@ -24,7 +24,7 @@ Once inside the NixOS container, you can start the TigerVNC server using:
 ```
 vncserver :(display) [for example, :1 for port 5901, :2 for port 5902 and so on.)
 ```
-To kill the TigerVNC server, run:
+To kill the TigerVNC server, `run`:
 ```
 vncserver :(display)
 ```
