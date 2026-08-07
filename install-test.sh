@@ -17,17 +17,17 @@ case "$ARCH" in
     *) echo "[-] Unsupported arch: $ARCH"; exit 1 ;;
 esac
 
-echo "[+] Finding latest NixOS version..."
-NIXOS_VERSION=$(curl -sL "https://images.linuxcontainers.org/images/nixos/" | grep -oE '[0-9]{2}\.[0-9]{2}' | tail -n 1)
+echo "[+] Finding latest NixOS version"
+# Grab the latest valid directory from the index (e.g., unstable or stable release numbers)
+NIXOS_VERSION=$(curl -sL "https://images.linuxcontainers.org/images/nixos/" | grep -oE '[0-9]{2}\.[0-9]{2}|unstable' | tail -n 1)
 
 if [ -z "$NIXOS_VERSION" ]; then
-    echo "[-] Error: Couldn't parse latest NixOS version."
-    exit 1
+    NIXOS_VERSION="unstable"
 fi
 
 BASE_URL="https://images.linuxcontainers.org/images/nixos/${NIXOS_VERSION}/${ARCH_URL}/default"
 
-echo "[+] Finding latest NixOS ${NIXOS_VERSION} build..."
+echo "[+] Finding latest NixOS (${NIXOS_VERSION}) build..."
 LATEST_BUILD=$(curl -sL "$BASE_URL/" | grep -oE '20[0-9]{6}_[0-9]{2}:[0-9]{2}' | tail -n 1)
 
 if [ -z "$LATEST_BUILD" ]; then
@@ -38,8 +38,8 @@ fi
 ROOTFS_URL="${BASE_URL}/${LATEST_BUILD}/rootfs.tar.xz"
 
 echo "[+] Found version: ${NIXOS_VERSION}, build: ${LATEST_BUILD}"
+echo "[+] Downloading NixOS from: ${ROOTFS_URL}"
 
-echo "[+] Downloading NixOS"
 wget --show-progress -O "$HOME/rootfs.tar.xz" "$ROOTFS_URL"
 mkdir -p "$NIXOS_DIR"
 
