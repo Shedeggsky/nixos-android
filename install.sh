@@ -59,29 +59,7 @@ if [ ! -f /root/.initialized ]; then
 fi
 EOF
 
-chmod +x "$NIXOS_DIR/root/nixfirst_boot.sh"
-
-cat << 'EOF' > "$NIXOS_DIR/root/.bashrc"
-# Auto-run first boot installer
-if [ -f /root/nixfirst_boot.sh ]; then
-    /root/nixfirst_boot.sh
-    rm -f /root/nixfirst_boot.sh
-fi
-
-# Print login banner
-echo ""
-echo "=================================================="
-echo " NixOS"
-echo " To install packages: nix-env -iA <package>"
-echo " To start VNC server: vncserver"
-echo " To exit: exit"
-echo "=================================================="
-echo ""
-EOF
-
-LAUNCHER="$HOME/nixos.sh"
-
-cat << 'EOF' > "$LAUNCHER"
+cat << 'EOF' > "$HOME/nixos.sh"
 #!/usr/bin/env bash
 NIXOS_DIR="$HOME/nixos-fs"
 
@@ -90,36 +68,51 @@ if [ ! -d "$NIXOS_DIR" ]; then
     exit 1
 fi
 
+# Automatically map /bin/sh to the Nix store bash if it doesn't exist yet
+if [ ! -e "$NIXOS_DIR/bin/sh" ]; then
+    mkdir -p "$NIXOS_DIR/bin"
+    BASH_PATH=$(ls -d "$NIXOS_DIR"/nix/store/*-bash-*/bin/bash 2>/dev/null | head -n 1)
+    if [ -n "$BASH_PATH" ]; then
+        ln -sf "${BASH_PATH#$NIXOS_DIR}" "$NIXOS_DIR/bin/sh"
+    fi
+fi
+
 echo "[+] Starting NixOS"
+
+# --- LOGIN BANNER ---
+clear
+echo "=================================================="
+echo " NixOS                                            "
+echo " To install packages: nix-env -iA nixos.(package) "
+echo "=================================================="
+echo ""
 
 cd $(dirname $0)
 ## unset LD_PRELOAD in case termux-exec is installed
 unset LD_PRELOAD
-command="proot"
-command+=" --link2symlink"
-command+=" -i 0:3003"
-command+=" -r nixos-fs"
+
+PROOT_ARGS="--link2symlink -i 0:3003 -r nixos-fs"
+
 if [ -n "$(ls -A nixos-binds 2>/dev/null)" ]; then
     for f in nixos-binds/* ;do
         . $f
     done
 fi
-command+=" -b /dev"
-command+=" -b /proc"
-command+=" -b nixos-fs/root:/dev/shm"
-command+=" -w /root"
-command+=" /bin/sh"
-com="$@"
-if [ -z "$1" ];then
-    exec $command -c "export PATH=/run/current-system/sw/bin:/bin:/usr/bin:/sbin:/usr/sbin HOME=/root TERM=$TERM LANG=en_US.UTF-8 LC_ALL=C LANGUAGE=en_US; exec /bin/sh"
+
+PROOT_ARGS+=" -b /dev -b /proc -b nixos-fs/root:/dev/shm -w /root"
+
+ENV_VARS="export PATH=/run/current-system/sw/bin:/bin:/usr/bin:/sbin:/usr/sbin; export HOME=/root; export TERM=$TERM; export LANG=en_US.UTF-8; export LC_ALL=C; export LANGUAGE=en_US;"
+
+if [ -z "$1" ]; then
+    exec proot $PROOT_ARGS /bin/sh -c "$ENV_VARS exec /bin/sh"
 else
-    exec proot --link2symlink -i 0:3003 -r nixos-fs -b /dev -b /proc -b nixos-fs/root:/dev/shm -w /root /bin/sh -c "export PATH=/run/current-system/sw/bin:/bin:/usr/bin:/sbin:/usr/sbin HOME=/root TERM=$TERM LANG=en_US.UTF-8 LC_ALL=C LANGUAGE=en_US; exec $com"
+    exec proot $PROOT_ARGS /bin/sh -c "$ENV_VARS exec $@"
 fi
 
 echo "[+] Exited NixOS."
 EOF
 
-chmod +x "$LAUNCHER"
+chmod +x "$HOME/nixos.sh"
 
 echo ""
 echo "=================================================="
