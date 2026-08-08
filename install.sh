@@ -46,7 +46,11 @@ wget --show-progress -O "$ROOTFS" "$URL"
 
 echo "[!] extracting"
 
-rm -rf "$NIXOS_DIR"
+if [ -d "$NIXOS_DIR" ]; then
+    echo "[!] old rootfs found"
+    mv "$NIXOS_DIR" "$NIXOS_DIR.old"
+fi
+
 mkdir -p "$NIXOS_DIR"
 
 sqfs2tar -r . "$ROOTFS" |
