@@ -66,18 +66,44 @@ cat << 'EOF' > "$HOME/nixos.sh"
 #!/usr/bin/env bash
 NIXOS_DIR="$HOME/nixos-fs"
 
+# 1. Create essential directory structure inside rootfs
 mkdir -p "$NIXOS_DIR/root" \
          "$NIXOS_DIR/tmp" \
          "$NIXOS_DIR/dev/shm" \
          "$NIXOS_DIR/usr/bin" \
          "$NIXOS_DIR/bin" \
-         "$NIXOS_DIR/etc" \
+         "$NIXOS_DIR/etc/nix" \
+         "$NIXOS_DIR/etc/ssl/certs" \
          "$NIXOS_DIR/var/nix/profiles"
 
+# 2. Mock /proc/stat to fix Android SELinux /proc restrictions
+cat << 'STAT' > "$NIXOS_DIR/tmp/fake_proc_stat"
+cpu  0 0 0 0 0 0 0 0 0 0
+cpu0 0 0 0 0 0 0 0 0 0 0
+STAT
+
+# 3. Configure Nix for PRoot (disable sandboxing and multi-user nixbld requirements)
+cat << 'NIXCONF' > "$NIXOS_DIR/etc/nix/nix.conf"
+build-users-group =
+sandbox = false
+NIXCONF
+
+touch "$NIXOS_DIR/etc/passwd" "$NIXOS_DIR/etc/group"
+grep -q "nixbld" "$NIXOS_DIR/etc/group" 2>/dev/null || echo "nixbld:x:30000:" >> "$NIXOS_DIR/etc/group"
+
+# 4. Locate SSL CA certificates in Nix store and configure symlinks
+CERT_PATH=$(ls -d "$NIXOS_DIR"/nix/store/*-cacert-*/etc/ssl/certs/ca-bundle.crt 2>/dev/null | head -n 1)
+if [ -n "$CERT_PATH" ]; then
+    CONTAINER_CERT="${CERT_PATH#$NIXOS_DIR}"
+    ln -sf "$CONTAINER_CERT" "$NIXOS_DIR/etc/ssl/certs/ca-certificates.crt"
+    ln -sf "$CONTAINER_CERT" "$NIXOS_DIR/etc/ssl/certs/ca-bundle.crt"
+else
+    CONTAINER_CERT="/etc/ssl/certs/ca-certificates.crt"
+fi
+
+# 5. Find essential container binaries (bash, env)
 STORE_BASH=$(ls -d "$NIXOS_DIR"/nix/store/*-bash-*/bin/bash 2>/dev/null | head -n 1)
 STORE_ENV=$(ls -d "$NIXOS_DIR"/nix/store/*-coreutils-*/bin/env 2>/dev/null | head -n 1)
-STORE_COREUTILS=$(ls -d "$NIXOS_DIR"/nix/store/*-coreutils-*/bin 2>/dev/null | head -n 1)
-STORE_NIX=$(ls -d "$NIXOS_DIR"/nix/store/*-nix-*/bin 2>/dev/null | head -n 1)
 
 if [ -z "$STORE_BASH" ] || [ -z "$STORE_ENV" ]; then
     echo "[-] Error: Could not find required binaries in Nix store."
@@ -86,23 +112,36 @@ fi
 
 CONTAINER_BASH="${STORE_BASH#$NIXOS_DIR}"
 CONTAINER_ENV="${STORE_ENV#$NIXOS_DIR}"
-COREUTILS_BIN_PATH="${STORE_COREUTILS#$NIXOS_DIR}"
-NIX_BIN_PATH="${STORE_NIX#$NIXOS_DIR}"
+
+# 6. Dynamically harvest utility bin paths from the Nix store for PATH
+STORE_PATHS=""
+for d in "$NIXOS_DIR"/nix/store/*-{coreutils,nix,bash,binutils,findutils,grep,sed,gnumake,cacert,curl}*/bin; do
+    if [ -d "$d" ]; then
+        STORE_PATHS="${d#$NIXOS_DIR}:$STORE_PATHS"
+    fi
+done
 
 clear
 echo "=================================================="
-echo " NixOS                                            "
-echo " To install packages: nix-env -iA nixos.(package)"
+echo " NixOS Container Launched                         "
+echo " To install packages: nix-env -iA nixos.(package) "
 echo "=================================================="
 echo ""
 
 unset LD_PRELOAD
 exec proot --link2symlink -i 0:3003 -r "$NIXOS_DIR" \
-    -b /dev -b /proc -b "$NIXOS_DIR/dev/shm:/dev/shm" -w /root \
+    -b /dev \
+    -b /proc \
+    -b "$NIXOS_DIR/tmp/fake_proc_stat:/proc/stat" \
+    -b "$NIXOS_DIR/dev/shm:/dev/shm" \
+    -w /root \
     "$CONTAINER_ENV" -i \
     HOME=/root \
     TERM="$TERM" \
-    PATH="$NIX_BIN_PATH:$COREUTILS_BIN_PATH:/root/.nix-profile/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin" \
+    GC_QUIET=1 \
+    NIX_SSL_CERT_FILE="$CONTAINER_CERT" \
+    SSL_CERT_FILE="$CONTAINER_CERT" \
+    PATH="${STORE_PATHS}/root/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin" \
     LANG="en_US.UTF-8" \
     "$CONTAINER_BASH" --login
 EOF
