@@ -4,7 +4,7 @@ set -e
 echo "NixOS install script executed"
 
 pkg update -y
-pkg install -y proot curl wget tar xz-utils
+pkg install -y proot curl wget squashfs-tools-ng tar xz-utils
 
 NIXOS_DIR="$HOME/nixos-fs"
 mkdir -p "$NIXOS_DIR"
@@ -28,17 +28,17 @@ if [ -z "$LATEST_BUILD" ]; then
     exit 1
 fi
 
-ROOTFS_URL="${BASE_URL}/${LATEST_BUILD}/rootfs.tar.xz"
+ROOTFS_URL="${BASE_URL}/${LATEST_BUILD}/rootfs.squashfs"
 
 echo "[+] Found version: ${NIXOS_VERSION}, build: ${LATEST_BUILD}"
 echo "[+] Downloading NixOS from: ${ROOTFS_URL}"
 
-wget --show-progress -O "$HOME/rootfs.tar.xz" "$ROOTFS_URL"
+wget --show-progress -O "$HOME/rootfs.squashfs" "$ROOTFS_URL"
 mkdir -p "$NIXOS_DIR"
 
 echo "[+] Extracting rootfs into $NIXOS_DIR"
-tar -xf "$HOME/rootfs.tar.xz" -C "$NIXOS_DIR" --overwrite 2>/dev/null || true
-rm -f "$HOME/rootfs.tar.xz"
+sqfs2tar -r . "$HOME/rootfs.squashfs" | tar -xf - -C "$NIXOS_DIR"
+rm -f "$HOME/rootfs.squashfs"
 
 mkdir -p "$NIXOS_DIR/etc"
 rm -rf "$NIXOS_DIR/etc/resolv.conf"
