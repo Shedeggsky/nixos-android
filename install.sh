@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
+echo "Currently bugged"
+echo "Will be archived if I somehow dont fix this"
+sleep 3
 echo "NixOS install script executed"
 
 pkg update -y
@@ -63,36 +66,33 @@ cat << 'EOF' > "$HOME/nixos.sh"
 #!/usr/bin/env bash
 NIXOS_DIR="$HOME/nixos-fs"
 
-if [ ! -d "$NIXOS_DIR" ]; then
-    echo "[-] Error: NixOS filesystem not found at $NIXOS_DIR"
-    exit 1
-fi
-
-cd $(dirname $0)
-unset LD_PRELOAD
-
-# Find the actual bash binary inside the Nix store container
+# Find bash and coreutils (env) inside the Nix store
 STORE_BASH=$(ls -d "$NIXOS_DIR"/nix/store/*-bash-*/bin/bash 2>/dev/null | head -n 1)
-if [ -z "$STORE_BASH" ]; then
-    echo "[-] Error: Could not find bash in Nix store."
+STORE_ENV=$(ls -d "$NIXOS_DIR"/nix/store/*-coreutils-*/bin/env 2>/dev/null | head -n 1)
+
+if [ -z "$STORE_BASH" ] || [ -z "$STORE_ENV" ]; then
+    echo "[-] Error: Could not find required binaries in Nix store."
     exit 1
 fi
-CONTAINER_BASH="${STORE_BASH#$NIXOS_DIR}"
 
+CONTAINER_BASH="${STORE_BASH#$NIXOS_DIR}"
+CONTAINER_ENV="${STORE_ENV#$NIXOS_DIR}"
+
+clear
 echo "=================================================="
 echo " NixOS                                            "
-echo " To install packages: nix-env -iA nixos.(package) "
+echo " To install packages: nix-env -iA nixpkgs.(package)"
 echo "=================================================="
 echo ""
 
-exec proot --link2symlink -i 0:3003 -r nixos-fs \
-    -b /dev -b /proc -b nixos-fs/root:/dev/shm -w /root \
-    /usr/bin/env -i \
+unset LD_PRELOAD
+exec proot --link2symlink -i 0:3003 -r "$NIXOS_DIR" \
+    -b /dev -b /proc -b "$NIXOS_DIR/root:/dev/shm" -w /root \
+    "$CONTAINER_ENV" -i \
     HOME=/root \
     TERM="$TERM" \
     PATH="/run/current-system/sw/bin:/bin:/usr/bin:/sbin:/usr/sbin" \
     LANG="en_US.UTF-8" \
-    LC_ALL="C" \
     "$CONTAINER_BASH"
 EOF
 
