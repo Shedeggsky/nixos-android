@@ -1,6 +1,7 @@
 # nixos-android
 ## Testing
-NixOS for Android (this time im smarter kool)
+### Very unstable (nix doesnt work, fastfetch works [if u modify the whole thing])
+NixOS for Android (this time im dumber kool)
 
 <img src="images/Screenshot_20260808_193213_Termux.jpg" width="500">
 
