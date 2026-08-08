@@ -1,6 +1,9 @@
 # nixos-android
 ## Testing
 NixOS for Android (this time im smarter kool)
+
+<img src="images/Screenshot_20260808_193213_Termux.jpg" width="500">
+
 ## Installation
 
 Open Termux and `run` this command:
