@@ -42,4 +42,4 @@ vncserver :(display)
 ```
 
 ## Reminders
-This sucks for begginers, tbh it was hard fixing path and coreutils
+This sucks for beginners, tbh it was hard fixing path and coreutils
