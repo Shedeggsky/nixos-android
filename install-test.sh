@@ -120,7 +120,7 @@ com="$@"
 if [ -z "$1" ];then
     exec $command
 else
-    $command -c "$com"
+    exec proot --link2symlink -i 0:3003 -r nixos-fs -b /dev -b /proc -b nixos-fs/root:/dev/shm -w /root /bin/sh -c "export PATH=/run/current-system/sw/bin:/bin:/usr/bin:/sbin:/usr/sbin HOME=/root TERM=$TERM LANG=en_US.UTF-8 LC_ALL=C LANGUAGE=en_US; exec $com"
 fi
 
 echo "[+] Exited NixOS."
