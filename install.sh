@@ -79,7 +79,6 @@ if [ -z "$STORE_BASH" ]; then
 fi
 CONTAINER_BASH="${STORE_BASH#$NIXOS_DIR}"
 
-clear
 echo "=================================================="
 echo " NixOS                                            "
 echo " To install packages: nix-env -iA nixos.(package) "
