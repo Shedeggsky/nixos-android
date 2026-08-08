@@ -222,6 +222,17 @@ NIXOS_DIR="$HOME/nixos-fs"
     exit 1
 }
 
+NIX_BIN="$(find "$NIXOS_DIR/nix/store" -maxdepth 2 \
+    -type f -path '*/bin/nix' 2>/dev/null |
+    head -n 1)"
+
+if [ -z "$NIX_BIN" ]; then
+    echo "[!] nix missing"
+    exit 1
+fi
+
+NIX_PATH="$(dirname "$NIX_BIN")"
+
 clear
 
 echo "================================="
@@ -255,7 +266,8 @@ exec proot \
     /usr/local/bin/env \
         HOME=/root \
         TERM="${TERM:-xterm-256color}" \
-        PATH="/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin" \
+        NIX_PATH="$NIX_PATH" \
+        PATH="/usr/local/bin:/usr/local/sbin:$NIX_PATH:/usr/sbin:/usr/bin:/sbin:/bin" \
         LANG="C.UTF-8" \
         LC_ALL="C.UTF-8" \
         /usr/local/bin/bash \
