@@ -66,9 +66,17 @@ cat << 'EOF' > "$HOME/nixos.sh"
 #!/usr/bin/env bash
 NIXOS_DIR="$HOME/nixos-fs"
 
-# Find bash, env, and nix binaries inside the Nix store
+mkdir -p "$NIXOS_DIR/root" \
+         "$NIXOS_DIR/tmp" \
+         "$NIXOS_DIR/dev/shm" \
+         "$NIXOS_DIR/usr/bin" \
+         "$NIXOS_DIR/bin" \
+         "$NIXOS_DIR/etc" \
+         "$NIXOS_DIR/var/nix/profiles"
+
 STORE_BASH=$(ls -d "$NIXOS_DIR"/nix/store/*-bash-*/bin/bash 2>/dev/null | head -n 1)
 STORE_ENV=$(ls -d "$NIXOS_DIR"/nix/store/*-coreutils-*/bin/env 2>/dev/null | head -n 1)
+STORE_COREUTILS=$(ls -d "$NIXOS_DIR"/nix/store/*-coreutils-*/bin 2>/dev/null | head -n 1)
 STORE_NIX=$(ls -d "$NIXOS_DIR"/nix/store/*-nix-*/bin 2>/dev/null | head -n 1)
 
 if [ -z "$STORE_BASH" ] || [ -z "$STORE_ENV" ]; then
@@ -78,6 +86,7 @@ fi
 
 CONTAINER_BASH="${STORE_BASH#$NIXOS_DIR}"
 CONTAINER_ENV="${STORE_ENV#$NIXOS_DIR}"
+COREUTILS_BIN_PATH="${STORE_COREUTILS#$NIXOS_DIR}"
 NIX_BIN_PATH="${STORE_NIX#$NIXOS_DIR}"
 
 clear
@@ -89,16 +98,17 @@ echo ""
 
 unset LD_PRELOAD
 exec proot --link2symlink -i 0:3003 -r "$NIXOS_DIR" \
-    -b /dev -b /proc -b "$NIXOS_DIR/root:/dev/shm" -w /root \
+    -b /dev -b /proc -b "$NIXOS_DIR/dev/shm:/dev/shm" -w /root \
     "$CONTAINER_ENV" -i \
     HOME=/root \
     TERM="$TERM" \
-    PATH="/run/current-system/sw/bin:$NIX_BIN_PATH:/nix/var/nix/profiles/default/bin:/bin:/usr/bin:/sbin:/usr/sbin" \
+    PATH="$NIX_BIN_PATH:$COREUTILS_BIN_PATH:/root/.nix-profile/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin:/usr/bin:/bin" \
     LANG="en_US.UTF-8" \
-    "$CONTAINER_BASH"
+    "$CONTAINER_BASH" --login
 EOF
 
 chmod +x "$HOME/nixos.sh"
+
 
 echo ""
 echo "=================================================="
