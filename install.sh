@@ -66,9 +66,10 @@ cat << 'EOF' > "$HOME/nixos.sh"
 #!/usr/bin/env bash
 NIXOS_DIR="$HOME/nixos-fs"
 
-# Find bash and coreutils (env) inside the Nix store
+# Find bash, env, and nix binaries inside the Nix store
 STORE_BASH=$(ls -d "$NIXOS_DIR"/nix/store/*-bash-*/bin/bash 2>/dev/null | head -n 1)
 STORE_ENV=$(ls -d "$NIXOS_DIR"/nix/store/*-coreutils-*/bin/env 2>/dev/null | head -n 1)
+STORE_NIX=$(ls -d "$NIXOS_DIR"/nix/store/*-nix-*/bin 2>/dev/null | head -n 1)
 
 if [ -z "$STORE_BASH" ] || [ -z "$STORE_ENV" ]; then
     echo "[-] Error: Could not find required binaries in Nix store."
@@ -77,11 +78,12 @@ fi
 
 CONTAINER_BASH="${STORE_BASH#$NIXOS_DIR}"
 CONTAINER_ENV="${STORE_ENV#$NIXOS_DIR}"
+NIX_BIN_PATH="${STORE_NIX#$NIXOS_DIR}"
 
 clear
 echo "=================================================="
 echo " NixOS                                            "
-echo " To install packages: nix-env -iA nixpkgs.(package)"
+echo " To install packages: nix-env -iA nixos.(package)"
 echo "=================================================="
 echo ""
 
@@ -91,7 +93,7 @@ exec proot --link2symlink -i 0:3003 -r "$NIXOS_DIR" \
     "$CONTAINER_ENV" -i \
     HOME=/root \
     TERM="$TERM" \
-    PATH="/run/current-system/sw/bin:/bin:/usr/bin:/sbin:/usr/sbin" \
+    PATH="/run/current-system/sw/bin:$NIX_BIN_PATH:/nix/var/nix/profiles/default/bin:/bin:/usr/bin:/sbin:/usr/sbin" \
     LANG="en_US.UTF-8" \
     "$CONTAINER_BASH"
 EOF
