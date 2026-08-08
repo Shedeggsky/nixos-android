@@ -3,7 +3,7 @@
 ### Very unstable (nix doesnt work, fastfetch works [if u modify the whole thing])
 NixOS for Android (this time im dumber kool)
 
-<img src="images/Screenshot_20260808_193213_Termux.jpg" width="500">
+<img src="images/preview.jpg" width="500">
 
 ## Installation
 
