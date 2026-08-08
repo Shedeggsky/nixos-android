@@ -68,18 +68,17 @@ if [ ! -d "$NIXOS_DIR" ]; then
     exit 1
 fi
 
-# Automatically map /bin/sh to the Nix store bash if it doesn't exist yet
-if [ ! -e "$NIXOS_DIR/bin/sh" ]; then
-    mkdir -p "$NIXOS_DIR/bin"
-    BASH_PATH=$(ls -d "$NIXOS_DIR"/nix/store/*-bash-*/bin/bash 2>/dev/null | head -n 1)
-    if [ -n "$BASH_PATH" ]; then
-        ln -sf "${BASH_PATH#$NIXOS_DIR}" "$NIXOS_DIR/bin/sh"
-    fi
+cd $(dirname $0)
+unset LD_PRELOAD
+
+# Find the actual bash binary inside the Nix store container
+STORE_BASH=$(ls -d "$NIXOS_DIR"/nix/store/*-bash-*/bin/bash 2>/dev/null | head -n 1)
+if [ -z "$STORE_BASH" ]; then
+    echo "[-] Error: Could not find bash in Nix store."
+    exit 1
 fi
+CONTAINER_BASH="${STORE_BASH#$NIXOS_DIR}"
 
-echo "[+] Starting NixOS"
-
-# --- LOGIN BANNER ---
 clear
 echo "=================================================="
 echo " NixOS                                            "
@@ -87,29 +86,15 @@ echo " To install packages: nix-env -iA nixos.(package) "
 echo "=================================================="
 echo ""
 
-cd $(dirname $0)
-## unset LD_PRELOAD in case termux-exec is installed
-unset LD_PRELOAD
-
-PROOT_ARGS="--link2symlink -i 0:3003 -r nixos-fs"
-
-if [ -n "$(ls -A nixos-binds 2>/dev/null)" ]; then
-    for f in nixos-binds/* ;do
-        . $f
-    done
-fi
-
-PROOT_ARGS+=" -b /dev -b /proc -b nixos-fs/root:/dev/shm -w /root"
-
-ENV_VARS="export PATH=/run/current-system/sw/bin:/bin:/usr/bin:/sbin:/usr/sbin; export HOME=/root; export TERM=$TERM; export LANG=en_US.UTF-8; export LC_ALL=C; export LANGUAGE=en_US;"
-
-if [ -z "$1" ]; then
-    exec proot $PROOT_ARGS /bin/sh -c "$ENV_VARS exec /bin/sh"
-else
-    exec proot $PROOT_ARGS /bin/sh -c "$ENV_VARS exec $@"
-fi
-
-echo "[+] Exited NixOS."
+exec proot --link2symlink -i 0:3003 -r nixos-fs \
+    -b /dev -b /proc -b nixos-fs/root:/dev/shm -w /root \
+    /usr/bin/env -i \
+    HOME=/root \
+    TERM="$TERM" \
+    PATH="/run/current-system/sw/bin:/bin:/usr/bin:/sbin:/usr/sbin" \
+    LANG="en_US.UTF-8" \
+    LC_ALL="C" \
+    "$CONTAINER_BASH"
 EOF
 
 chmod +x "$HOME/nixos.sh"
