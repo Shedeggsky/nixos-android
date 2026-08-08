@@ -18,7 +18,7 @@ case "$ARCH" in
 esac
 
 NIXOS_VERSION="26.05"
-BASE_URL="https://images.linuxcontainers.org/images/nixos/${NIXOS_VERSION}/${ARCH}/default"
+BASE_URL="https://images.linuxcontainers.org/images/nixos/${NIXOS_VERSION}/${ARCH_URL}/default"
 
 echo "[+] Finding latest NixOS (${NIXOS_VERSION}) build"
 LATEST_BUILD=$(curl -sL "$BASE_URL/" | grep -oE '20[0-9]{6}_[0-9]{2}:[0-9]{2}' | tail -n 1 | tr -d '"/' )
