@@ -1,0 +1,2 @@
+They might not work (I have to find an archived rootfs and move the old install.sh here)
+The install.sh will be called (install-[version].sh)
