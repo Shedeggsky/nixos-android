@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-set -e
+set -Eeuo pipefail
+
+trap 'echo ""; echo "[!] installer failed on line $LINENO"; exit 1' ERR
 
 echo "================================="
 echo "NixOS 26.05"
 echo "PRoot Android build"
-echo "Full code rework"
 echo "================================="
 sleep 2
 
@@ -31,7 +32,7 @@ BUILD=$(curl -fsSL "$BASE/" |
     sort |
     tail -n 1)
 
-[ -z "$BUILD" ] && {
+[ -n "$BUILD" ] || {
     echo "[!] could not find a build"
     exit 1
 }
@@ -93,7 +94,7 @@ grep -q '^nixbld:' "$NIXOS_DIR/etc/group" 2>/dev/null ||
 
 CERT=$(find "$NIXOS_DIR/nix/store" \
     -path '*/etc/ssl/certs/ca-bundle.crt' \
-    -type f 2>/dev/null | head -n 1)
+    -type f 2>/dev/null | head -n 1 || true)
 
 if [ -n "$CERT" ]; then
     CERT="${CERT#$NIXOS_DIR}"
@@ -110,43 +111,70 @@ findbin() {
         head -n 1
 }
 
-BASH=$(findbin "-bash-")
-CORE=$(findbin "-coreutils-")
-NIX=$(findbin "-nix-")
-FIND=$(findbin "-findutils-")
-GREP=$(findbin "-grep-")
-SED=$(findbin "-gnused-")
-CURL=$(findbin "-curl-")
+BASH_PATH=$(findbin "-bash-")
+CORE_PATH=$(findbin "-coreutils-")
+NIX_PATH=$(findbin "-nix-")
+FIND_PATH=$(findbin "-findutils-")
+GREP_PATH=$(findbin "-grep-")
+SED_PATH=$(findbin "-gnused-")
+CURL_PATH=$(findbin "-curl-")
 
-if [ -z "$BASH" ] || [ -z "$CORE" ] || [ -z "$NIX" ]; then
-    echo "[!] required nix packages not found"
+echo "[!] checking packages"
+
+if [ -z "$BASH_PATH" ]; then
+    echo "[!] bash not found"
+    exit 1
+fi
+
+if [ -z "$CORE_PATH" ]; then
+    echo "[!] coreutils not found"
+    exit 1
+fi
+
+if [ -z "$NIX_PATH" ]; then
+    echo "[!] nix not found"
     exit 1
 fi
 
 addbin() {
-    [ -d "$1/bin" ] || return
+    [ -d "$1/bin" ] || return 0
+
     for x in "$1/bin/"*; do
         [ -e "$x" ] || continue
+
         n=$(basename "$x")
-        [ -e "$NIXOS_DIR/usr/local/bin/$n" ] || \
+
+        [ -e "$NIXOS_DIR/usr/local/bin/$n" ] ||
             ln -s "$x" "$NIXOS_DIR/usr/local/bin/$n"
     done
 }
 
-addbin "$CORE"
-addbin "$BASH"
-addbin "$NIX"
-addbin "$FIND"
-addbin "$GREP"
-addbin "$SED"
-addbin "$CURL"
+echo "[!] linking packages"
+
+addbin "$CORE_PATH"
+addbin "$BASH_PATH"
+addbin "$NIX_PATH"
+addbin "$FIND_PATH"
+addbin "$GREP_PATH"
+addbin "$SED_PATH"
+addbin "$CURL_PATH"
 
 mkdir -p "$NIXOS_DIR/bin"
 
 ln -sf /usr/local/bin/bash "$NIXOS_DIR/bin/bash"
 ln -sf /usr/local/bin/bash "$NIXOS_DIR/bin/sh"
 
-[ -f "$NIXOS_DIR/etc/os-release" ] || cat > "$NIXOS_DIR/etc/os-release" <<'EOF'
+if [ ! -x "$NIXOS_DIR/usr/local/bin/ls" ]; then
+    echo "[!] coreutils setup failed"
+    exit 1
+fi
+
+if [ ! -x "$NIXOS_DIR/usr/local/bin/bash" ]; then
+    echo "[!] bash setup failed"
+    exit 1
+fi
+
+cat > "$NIXOS_DIR/etc/os-release" <<'EOF'
 NAME="NixOS"
 ID=nixos
 VERSION="26.05"
@@ -168,7 +196,9 @@ EOF
 
 chmod +x "$NIXOS_DIR/root/nixfirst_boot.sh"
 
-cat > "$HOME/nixos.sh" <<'EOF'
+echo "[!] creating launcher"
+
+cat << 'EOF' > "$HOME/nixos.sh"
 #!/usr/bin/env bash
 
 NIXOS_DIR="$HOME/nixos-fs"
@@ -230,6 +260,11 @@ exec proot \
 EOF
 
 chmod +x "$HOME/nixos.sh"
+
+if [ ! -x "$HOME/nixos.sh" ]; then
+    echo "[!] launcher creation failed"
+    exit 1
+fi
 
 echo ""
 echo "================================="
