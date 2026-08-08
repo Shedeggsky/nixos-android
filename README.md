@@ -40,3 +40,6 @@ To kill the TigerVNC server, `run`:
 ```bash
 vncserver :(display)
 ```
+
+## Reminders
+This sucks for begginers, tbh it was hard fixing path and coreutils
