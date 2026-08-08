@@ -17,14 +17,7 @@ case "$ARCH" in
     *) echo "[-] Unsupported arch: $ARCH"; exit 1 ;;
 esac
 
-echo "[+] Finding latest NixOS version"
-# Grab the latest valid directory from the index (e.g., unstable or stable release numbers)
-NIXOS_VERSION=$(curl -sL "https://images.linuxcontainers.org/images/nixos/" | grep -oE '[0-9]{2}\.[0-9]{2}|unstable' | tail -n 1)
-
-if [ -z "$NIXOS_VERSION" ]; then
-    NIXOS_VERSION="unstable"
-fi
-
+NIXOS_VERSION="26.05"
 BASE_URL="https://images.linuxcontainers.org/images/nixos/${NIXOS_VERSION}/${ARCH_URL}/default"
 
 echo "[+] Finding latest NixOS (${NIXOS_VERSION}) build..."
