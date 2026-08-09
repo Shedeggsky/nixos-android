@@ -35,7 +35,7 @@ chmod -R +w "nixos-fs" 2>/dev/null || true
 rm -rf -f --no-preserve-root nixos-fs
 ```
 
-To permanently fix PATH, `run`: (i havent tested this yet)
+To not fix PATH, `run`: (most of coreutils are gone)
 ```
 NIX_BIN_DIR="$(ls -d "$NIXOS_DIR"/nix/store/*-nix-[0-9]*/bin 2>/dev/null | head -n 1)"
 ```
