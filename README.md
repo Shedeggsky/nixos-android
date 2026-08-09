@@ -18,6 +18,11 @@ To launch your NixOS container, `run`:
 ./nixos.sh
 ```
 
+To temporarily fix PATH, `run`:
+```
+export PATH="/nix/store/3sa1v05jzj4qdv3n5r2v9wagpxgw0cxf-nix-2.34.8/bin:/root/.nix-profile/bin:/usr/local/bin:/nix/var/nix/profiles/default/bin:$PATH"
+```
+
 To exit the container sessioin, `run`:
 ```bash
 exit
@@ -28,6 +33,14 @@ To delete NixOS, `run`:
 rm -f nixos.sh
 chmod -R +w "nixos-fs" 2>/dev/null || true
 rm -rf -f --no-preserve-root nixos-fs
+```
+
+To permanently fix PATH, `run`: (i havent tested this yet)
+```
+NIX_BIN_DIR="$(ls -d "$NIXOS_DIR"/nix/store/*-nix-[0-9]*/bin 2>/dev/null | head -n 1)"
+```
+```
+PATH="/root/.nix-profile/bin:$NIX_BIN_DIR:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
 ```
 
 ## General Tips & Commands
