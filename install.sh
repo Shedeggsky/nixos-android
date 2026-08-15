@@ -106,22 +106,24 @@ if [ -n "$CERT" ]; then
     ln -sf "$CERT" "$NIXOS_DIR/etc/ssl/certs/ca-bundle.crt"
 fi
 
-findbin() {
-    find "$NIXOS_DIR/nix/store" \
-        -maxdepth 1 \
-        -type d \
-        -name "*$1*" 2>/dev/null |
-        sort |
-        head -n 1
+# Finds the store path that actually contains bin/$1, instead of matching
+# store directory NAMES by substring. Substring matching (e.g. "*-nix-*")
+# breaks once a package is split into several derivations that all share
+# that substring (nix-util, nix-store, nix-cli, ...) - you can land on one
+# with no real binary inside, and never know it failed.
+findpkg() {
+    local bin
+    bin=$(find "$NIXOS_DIR/nix/store" -type f -path "*/bin/$1" 2>/dev/null | sort | head -n 1)
+    [ -n "$bin" ] && dirname "$(dirname "$bin")"
 }
 
-BASH_PATH=$(findbin "-bash-")
-CORE_PATH=$(findbin "-coreutils-")
-NIX_PATH=$(findbin "-nix-")
-FIND_PATH=$(findbin "-findutils-")
-GREP_PATH=$(findbin "-grep-")
-SED_PATH=$(findbin "-gnused-")
-CURL_PATH=$(findbin "-curl-")
+BASH_PATH=$(findpkg "bash")
+CORE_PATH=$(findpkg "ls")
+NIX_STORE_PATH=$(findpkg "nix")
+FIND_PATH=$(findpkg "find")
+GREP_PATH=$(findpkg "grep")
+SED_PATH=$(findpkg "sed")
+CURL_PATH=$(findpkg "curl")
 
 echo "[!] checking packages"
 
@@ -135,7 +137,7 @@ if [ -z "$CORE_PATH" ]; then
     exit 1
 fi
 
-if [ -z "$NIX_PATH" ]; then
+if [ -z "$NIX_STORE_PATH" ]; then
     echo "[!] nix not found"
     exit 1
 fi
@@ -147,9 +149,10 @@ addbin() {
         [ -e "$x" ] || continue
 
         n=$(basename "$x")
+        target="${x#$NIXOS_DIR}"
 
         [ -e "$NIXOS_DIR/usr/local/bin/$n" ] ||
-            ln -s "$x" "$NIXOS_DIR/usr/local/bin/$n"
+            ln -s "$target" "$NIXOS_DIR/usr/local/bin/$n"
     done
 }
 
@@ -157,7 +160,7 @@ echo "[!] linking packages"
 
 addbin "$CORE_PATH"
 addbin "$BASH_PATH"
-addbin "$NIX_PATH"
+addbin "$NIX_STORE_PATH"
 addbin "$FIND_PATH"
 addbin "$GREP_PATH"
 addbin "$SED_PATH"
@@ -222,8 +225,12 @@ NIXOS_DIR="$HOME/nixos-fs"
     exit 1
 }
 
-NIX_BIN="$(find "$NIXOS_DIR/nix/store" -maxdepth 2 \
+# NOTE: no -maxdepth here. nix/store -> <hash-name> -> bin -> nix is
+# THREE levels down; a "-maxdepth 2" search (as this used to have) can
+# never reach a file at that depth, so it always came back empty.
+NIX_BIN="$(find "$NIXOS_DIR/nix/store" \
     -type f -path '*/bin/nix' 2>/dev/null |
+    sort |
     head -n 1)"
 
 if [ -z "$NIX_BIN" ]; then
@@ -231,7 +238,11 @@ if [ -z "$NIX_BIN" ]; then
     exit 1
 fi
 
-NIX_PATH="$(dirname "$NIX_BIN")"
+# Strip the host-side $NIXOS_DIR prefix so this is a path relative to the
+# proot root, not the real host path. Same idea as the ca-cert symlink
+# above: once proot re-roots an absolute path, a leftover host prefix
+# means the target no longer exists from inside the chroot.
+NIX_BIN_DIR="$(dirname "${NIX_BIN#$NIXOS_DIR}")"
 
 clear
 
@@ -241,7 +252,7 @@ echo "PRoot | Very Unstable"
 echo "================================="
 echo ""
 echo "To install packages"
-echo "nix-env -iA nixpkgs.package"
+echo "nix profile install nixpkgs#package"
 echo ""
 echo "Starting"
 
@@ -266,8 +277,7 @@ exec proot \
     /usr/local/bin/env \
         HOME=/root \
         TERM="${TERM:-xterm-256color}" \
-        NIX_PATH="$NIX_PATH" \
-        PATH="/usr/local/bin:/usr/local/sbin:$NIX_PATH:/usr/sbin:/usr/bin:/sbin:/bin" \
+        PATH="/root/.nix-profile/bin:/usr/local/bin:/usr/local/sbin:$NIX_BIN_DIR:/usr/sbin:/usr/bin:/sbin:/bin" \
         LANG="C.UTF-8" \
         LC_ALL="C.UTF-8" \
         /usr/local/bin/bash \
