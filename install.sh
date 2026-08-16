@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 trap 'echo ""; echo "[!] installer failed on line $LINENO"; exit 1' ERR
 
+clear
 echo "================================="
 echo "NixOS 26.05"
 echo "PRoot Android build"
@@ -106,15 +107,16 @@ if [ -n "$CERT" ]; then
     ln -sf "$CERT" "$NIXOS_DIR/etc/ssl/certs/ca-bundle.crt"
 fi
 
-# Finds the store path that actually contains bin/$1, instead of matching
+# finds the store path that actually contains bin/$1, instead of matching
 # store directory NAMES by substring. Substring matching (e.g. "*-nix-*")
 # breaks once a package is split into several derivations that all share
 # that substring (nix-util, nix-store, nix-cli, ...) - you can land on one
-# with no real binary inside, and never know it failed.
+# with no real binary inside, and never know it failed
 findpkg() {
     local bin
-    bin=$(find "$NIXOS_DIR/nix/store" -type f -path "*/bin/$1" 2>/dev/null | sort | head -n 1)
+    bin=$(find "$NIXOS_DIR/nix/store" -type f -path "*/bin/$1" 2>/dev/null | sort | head -n 1 || true)
     [ -n "$bin" ] && dirname "$(dirname "$bin")"
+    return 0
 }
 
 BASH_PATH=$(findpkg "bash")
@@ -231,7 +233,7 @@ NIXOS_DIR="$HOME/nixos-fs"
 NIX_BIN="$(find "$NIXOS_DIR/nix/store" \
     -type f -path '*/bin/nix' 2>/dev/null |
     sort |
-    head -n 1)"
+    head -n 1 || true)"
 
 if [ -z "$NIX_BIN" ]; then
     echo "[!] nix missing"
